@@ -1,0 +1,1110 @@
+$(document).ready(function() {
+
+    var info_modified_event = "info_modified_event";
+
+    var template = {
+        edit: window.contextPath + "/citizen-home/profile/partial-views/edit",
+        type: window.contextPath + "/citizen-home/profile/partial-views/type",
+        transaction: window.contextPath + "/citizen-home/profile/partial-views/transaction",
+        document: window.contextPath + "/citizen-home/profile/partial-views/document",
+        confirm: window.contextPath + "/citizen-home/profile/partial-views/confirm"
+    };
+
+    var backTo = function (templateName, callback) {
+        templateLoader.load({
+            templateName: templateName,
+            partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+            elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")],
+            after: callback
+        });
+    };
+
+    var container = $("#container");
+
+    container.on("click", "#edit", function () {
+        $('#modal').modal({
+            onApprove: function () {
+                templateLoader.load({
+                    templateName: template.edit,
+                    partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                    elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")],
+                    after: function () {
+                        tabularMenuSwitcher.switchToActiveTab();
+                        $('.correction-restricted').addClass("disabled").attr('disabled', true);
+                    }
+                });
+            }
+        }).modal('show');
+    });
+
+    container.on("click", "#next-type", function() {
+        asyncForm.handleWithCare({
+            templateParams: {
+                partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")]
+            }
+        });
+    });
+
+    container.on("click", "#next-transaction", function () {
+        asyncForm.handleWithCare({
+            templateParams: {
+                partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")]
+            }
+        });
+    });
+
+    container.on("click", "#next-document", function () {
+        asyncForm.handleWithCare({
+            templateParams: {
+                partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")]
+            }
+        });
+    });
+
+    container.on("click", "#update", function() {
+        pageReloadHandler.destroy();
+        asyncForm.handleWithCare();
+    });
+
+    container.on("click", "#next-confirm", function() {
+        var $form = $("#form");
+        var allFiles = $form.find("input[type=file]");
+        if(allFiles.length > 0) {
+            var docFormData = new FormData();
+            docFormData.append("nsAgentId", $("input[name=nsAgentId]").val());
+            asyncForm.handleWithCare({
+                upload: true,
+                data: docFormData,
+                doneCallback: function(jqXHR) {
+                    var res = JSON.parse(jqXHR);
+                    if(res.status === "SUCCESS") {
+                        templateLoader.load({
+                            templateName: window.contextPath + res.success.template,
+                            partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                            elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")]
+                        });
+                    }
+                    if(res.status === "ERROR") {
+                        $("#error-block").addClass("error").show().find("ul > li").text(res.error.message);
+                    }
+                }
+            });
+        } else {
+            templateLoader.load({
+                templateName: template.confirm,
+                partialViewContainer: $(".ui.grid.wrapper.non-rounded-corners.claim-right"),
+                elementsToReplace: [$(".sixteen.wide.column"), $(".sixteen.wide.column.options")]
+            });
+        }
+    });
+
+    container.on("click", "#back-edit", function() {
+        backTo(template.edit, function () {
+            tabularMenuSwitcher.switchToActiveTab();
+            $('.correction-restricted').addClass("disabled").attr('disabled', true);
+        });
+    });
+
+    container.on("click", "#back-type", function () {
+        backTo(template.type);
+    });
+
+    container.on("click", "#back-transaction", function () {
+        backTo(template.transaction);
+    });
+
+    container.on("click", "#back-document", function () {
+        backTo(template.document);
+    });
+
+    container.on("click", "#upload", function () {
+        var fileElement = $("#file");
+        fileElement.trigger("click");
+    });
+
+    container.on("change", "#file", function(event) {
+        var $image = $("#profile-photo");
+        var files = event.target.files;
+        var file = files[0];
+        if(files && file) {
+            if(file.size >= window.uploadLimit) {
+                var message = window.uploadLimitMessage.format(filesize(window.uploadLimit), filesize(file.size));
+                $("#error-block").addClass("error").show().find("ul > li").text(message);
+                $image.parents(".ui.card").addClass("error");
+            } else {
+                var asyncTask = portalUtils.async.checksum(file);
+                asyncTask.done(function(checksum) {
+                    var formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("checksum", checksum);
+                    asyncForm.handleWithCare({
+                        upload: true,
+                        data: formData,
+                        url: window.contextPath + "/citizen-home/profile/upload-photo",
+                        doneCallback: function(jqXHR) {
+                            var res = JSON.parse(jqXHR);
+                            if(res.status === "ERROR") {
+                                $("#error-block").addClass("error").show().find("ul > li").text(res.error.message);
+                                $image.parents(".ui.card").addClass("error");
+                                return;
+                            }
+                            if(res.status === 'WARNING') {
+                                $("#error-block").addClass("warning").show().find("ul > li").text(res.warning.message);
+                                $image.parents(".ui.card").addClass("updated");
+                            }
+                            console.log("should only print during warning, success");
+                            $image.attr("src", window.contextPath + "/citizen-home/profile/uploaded-photo?t=" + Date.now());
+                            $image.parents(".ui.card").addClass("updated");
+                            container.trigger(info_modified_event);
+                        }
+                    });
+                });
+            }
+        }
+    });
+
+    container.on("click", ".upload-document", function() {
+       $(this).parent().parent().find("input[type=file]").trigger("click");
+    });
+
+    container.on("click", ".doc-remove", function() {
+        var $this = $(this);
+        var $parent = $this.parent();
+        var $fileCtrl = $parent.find("input[type=file]");
+        var formData = new FormData();
+        formData.append("identifier", $fileCtrl.attr("data-id"));
+        asyncForm.handleWithCare({
+            upload: true,
+            data: formData,
+            url: window.contextPath + "/citizen-home/profile/remove-document",
+            doneCallback: docUploadSuccessHandler
+        });
+    });
+
+    const docUploadSuccessHandler = (jqXHR) => {
+        let res1 = JSON.parse(jqXHR);
+        if(res1.status === "ERROR") {
+            showErrorMessage(res1.error.message);
+            return;
+        }
+        let $el = $("#doc-tr");
+        $el.empty();
+        let row = ``;
+        $.each(res1.success.data, (index, data) => {
+            row += tableTr(data);
+        });
+        $el.html(row);
+    };
+
+    const tableTr = (data) => {
+        let docTypeName = $('#doc-type>option[value=' + data.fileType + ']').text();
+        return ` <tr>
+                    <td> ${docTypeName} </td>
+                    <td> ${data.fileName} </td>
+                    <td>
+                        <div class="content">
+                            <div class="doc-remove right floated compact ui button medium remove-document">
+                                <i class="icon remove"></i>
+                                <span>${window.messageConfigs.messages["doc.list.remove.item"]}</span>
+                            </div>
+                            <input type="file" class="doc-remove" style="position: absolute; left: -9999px;" data-id="${data.identifier}">
+                        </div>                    
+                    </td>
+                </tr>
+                  `;
+    };
+
+    container.on("change", "#doc-upload", function(event) {
+        let $el1 = $("#file-upload-input");
+        $el1.html(`<input type="file" id="doc-upload" style="position: absolute; left: -9999px;" id="doc-up-id" data-name="doc-name">`);
+        let files = event.target.files;
+        let file = files[0];
+        if(files && file) {
+            if (file.size > window.uploadLimit || !window._fileType.has(file.type)) {
+                let message = window.uploadLimitMessage;
+                showErrorMessage(message);
+            } else {
+                const appId = $('#applicationId').val();
+                const fileName = file.name;
+                const urlGetUrl = window.contextPath + '/citizen-home/profile/get-url';
+                let formData = new FormData();
+                formData.append("appId", appId);
+                formData.append("fileName", fileName);
+
+                asyncForm.handleWithCare({
+                    upload: true,
+                    data: formData,
+                    url: urlGetUrl,
+                    doneCallback: function(jqXHR) {
+                        let res = JSON.parse(jqXHR);
+                        if(res.status === "ERROR") {
+                            showErrorMessage(res.error.message);
+                            return;
+                        }
+                        const j1 = res.success.data;
+                        const mUrl = j1.url;
+                        fetch(mUrl, {method: 'PUT', body: file})
+                            .then((response) => {
+                                if (response.status !== 200){
+                                    showErrorMessage();
+                                    return;
+                                }
+                                const updateDocUrl = window.contextPath + "/citizen-home/profile/update-application-document";
+                                let formData1 = new FormData();
+                                formData1.append("cardAppId", appId);
+                                formData1.append("identifier", j1.identifier);
+                                formData1.append("fileName", file.name);
+                                formData1.append("fileType", $('#doc-type').find(":selected").val());
+                                formData1.append("bucketName", j1.bucketName);
+                                formData1.append("objectName", j1.objectName);
+
+                                asyncForm.handleWithCare({
+                                    upload: true,
+                                    data: formData1,
+                                    url: updateDocUrl,
+                                    doneCallback: docUploadSuccessHandler
+                                });
+
+                            }).catch(r6 => {
+                            showErrorMessage(window.error['networkConnection']);
+                        });
+
+                    }
+                });
+            }
+        }
+    });
+
+    const showErrorMessage = (message) => {
+        let _message;
+        if (typeof message === "undefined") {
+            _message = window.error['unknown'];
+        } else {
+            _message = message;
+        }
+        $("#error-block").addClass("error").show().find("ul > li").text(_message);
+    }
+
+    let isDisabilityOrReligion = function (value) {
+        return value === 'religion' || value === 'disability';
+    }
+
+    let handleOtherFields = function (el, mark) {
+        let $element = $(el);
+        let elementName = $element.attr("name");
+        let elementCurValue = $element.val();
+        if ($.inArray(elementName, helperMap.input_has_other) !== -1) {
+            if (mark) {
+                $element.next().attr("disabled", mark);
+                if (isDisabilityOrReligion(elementName)) {
+                    if (elementCurValue === "other") {
+                        $element.next().show();
+                        if (oldValues[elementName+"Other"] !== '') $element.next().val(oldValues[elementName+"Other"]);
+                    } else if (elementCurValue !== "other") {
+                        $element.next().hide();
+                    }
+                }
+            } else if (!mark) {
+                $element.next().attr("disabled", mark);
+                if (isDisabilityOrReligion(elementName)) {
+                    if (elementCurValue === "other") {
+                        $element.next().show();
+                    } else if (elementCurValue !== "other") {
+                        $element.next().hide();
+                    }
+                }
+            }
+        }
+    }
+
+    const lookupReset = {
+        division: function () {$("select[name=division]").val(oldValues["division"]);},
+        district: function () {
+            lookupLoader.load({
+                resource: "district",
+                filter: {divisionId: oldValues["division"]},
+                target: "select[name=district]",
+                done: function () {
+                    $("select[name=district]").val(oldValues["district"]);
+                }
+            });
+        },
+        upozila: function () {
+            lookupLoader.load({
+                resource: "upozila",
+                filter: {districtId: oldValues["district"]},
+                target: "select[name=upozila]",
+                done: function () {
+                    $("select[name=upozila]").val(oldValues["upozila"]);
+                }
+            });
+        },
+        rmo: function () {
+            $("select[name=rmo]").val(oldValues["rmo"]);
+        },
+        city: function () {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: oldValues["upozila"], rmoId: oldValues["rmo"]},
+                target: "select[name=city]",
+                done: function () {
+                    $("select[name=city]").val(oldValues["city"]);
+                }
+            });
+        },
+        union: function () {
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: oldValues["upozila"], cityId: oldValues["city"], rmoId: oldValues["rmo"]},
+                target: "select[name=union]",
+                done: function () {
+                    $("select[name=union]").val(oldValues["union"]);
+                }
+            });
+        },
+        area: function () {
+            lookupLoader.load({
+                resource: "area",
+                filter: {unionId: oldValues["union"]},
+                target: "select[name=area]",
+                done: function () {
+                    $("select[name=area]").val(oldValues["area"]);
+                    var $areaOther = $("input[name=areaOther]");
+                    if (oldValues["area"] === "undefined") {
+                        $areaOther.show();
+                    } else {
+                        $areaOther.hide();
+                    }
+                    $areaOther.val(oldValues["areaOther"]);
+                }
+            });
+        },
+        ward: function () { $("input[name=ward]").val(oldValues["ward"]); },
+        village: function () {
+            lookupLoader.load({
+                resource: "village",
+                filter: {areaId: oldValues["area"]},
+                target: "select[name=village]",
+                done: function () {
+                    $("select[name=village]").val(oldValues["village"]);
+                    var $villageOther = $("input[name=villageOther]");
+                    if (oldValues["village"] === 'undefined') {
+                        $villageOther.show();
+                    } else {
+                        $villageOther.hide();
+                    }
+                    $villageOther.val(oldValues["villageOther"]);
+                }
+            });
+        },
+        house: function () {  $("input[name=house]").val(oldValues["house"]); },
+        postOffice: function () {
+            searchBoxLookupLoader.load({
+                resource: "postOffice",
+                filter: {districtId: oldValues["district"]},
+                target: "input[name=postOffice]",
+                elementToUpdate: "input[name=postcode]",
+                done: function () {
+                    $("input[name=postOffice]").val(oldValues["postOffice"]);
+                }
+            });
+        },
+        postcode: function () { $("input[name=postcode]").val(oldValues["postcode"]); },
+        voterArea: function () {
+            lookupLoader.load({
+                resource: "voterArea",
+                filter: {unionId: oldValues["union"]},
+                target: "select[name=voterArea]",
+                done: function () {
+                    $("select[name=voterArea]").val(oldValues["voterArea"]);
+                    $("div.present-address div.voter-area-change-detail").hide().find("input").val("");
+                }
+            });
+        },
+        perDistrict: function () {
+            lookupLoader.load({
+                resource: "district",
+                filter: {divisionId: oldValues["perDivision"]},
+                target: "select[name=perDistrict]",
+                done: function () {
+                    $("select[name=perDistrict]").val(oldValues["perDistrict"]);
+                }
+            });
+        },
+        perUpozila: function () {
+            lookupLoader.load({
+                resource: "upozila",
+                filter: {districtId: oldValues["perDistrict"]},
+                target: "select[name=perUpozila]",
+                done: function () {
+                    $("select[name=perUpozila]").val(oldValues["perUpozila"]);
+                }
+            });
+        },
+        perCity: function () {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: oldValues["perUpozila"], rmoId: oldValues["perRmo"]},
+                target: "select[name=perCity]",
+                done: function () {
+                    $("select[name=perCity]").val(oldValues["perCity"]);
+                }
+            });
+        },
+        perUnion: function () {
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: oldValues["perUpozila"], cityId: oldValues["perCity"], rmoId: oldValues["perRmo"]},
+                target: "select[name=perUnion]",
+                done: function () {
+                    $("select[name=perUnion]").val(oldValues["perUnion"]);
+                }
+            });
+        },
+        perArea: function () {
+            lookupLoader.load({
+                resource: "area",
+                filter: {unionId: oldValues["perUnion"]},
+                target: "select[name=perArea]",
+                done: function () {
+                    $("select[name=perArea]").val(oldValues["perArea"]);
+                    var $areaOther = $("input[name=perAreaOther]");
+                    if (oldValues["perArea"] === "undefined") {
+                        $areaOther.show();
+                    } else {
+                        $areaOther.hide();
+                    }
+                    $areaOther.val(oldValues["perAreaOther"]);
+                }
+            });
+        },
+        perWard: function () { $("input[name=perWard]").val(oldValues["perWard"]); },
+        perVillage: function () {
+            lookupLoader.load({
+                resource: "village",
+                filter: {areaId: oldValues["perArea"]},
+                target: "select[name=perVillage]",
+                done: function () {
+                    $("select[name=perVillage]").val(oldValues["perVillage"]);
+                    var $villageOther = $("input[name=perVillageOther]");
+                    if (oldValues["perVillage"] === 'undefined') {
+                        $villageOther.show();
+                    } else {
+                        $villageOther.hide();
+                    }
+                    $villageOther.val(oldValues["perVillageOther"]);
+                }
+            });
+        },
+        perHouse: function () {  $("input[name=perHouse]").val(oldValues["perHouse"]); },
+        perPostOffice: function () {
+            searchBoxLookupLoader.load({
+                resource: "postOffice",
+                filter: {districtId: oldValues["perDistrict"]},
+                target: "input[name=perPostOffice]",
+                elementToUpdate: "input[name=perPostcode]",
+                done: function () {
+                    $("input[name=perPostOffice]").val(oldValues["perPostOffice"]);
+                }
+            });
+        },
+        perPostcode: function () { $("input[name=perPostcode]").val(oldValues["perPostcode"]); },
+        perVoterArea: function () {
+            lookupLoader.load({
+                resource: "voterArea",
+                filter: {unionId: oldValues["perUnion"]},
+                target: "select[name=perVoterArea]",
+                done: function () {
+                    $("select[name=perVoterArea]").val(oldValues["perVoterArea"]);
+                    $("div.permanent-address div.voter-area-change-detail").hide().find("input").val("");
+                }
+            });
+        },
+    }
+
+    const helperMap = {
+        present_lookup_all: [lookupReset.division, lookupReset.district, lookupReset.upozila,
+            lookupReset.rmo, lookupReset.city, lookupReset.union, lookupReset.area, lookupReset.ward,
+            lookupReset.village, lookupReset.house, lookupReset.postOffice, lookupReset.postcode],
+        present_lookup_min: [lookupReset.house, lookupReset.postOffice, lookupReset.postcode],
+        permanent_lookup_min: [lookupReset.perHouse, lookupReset.perPostOffice, lookupReset.perPostcode],
+        present_selectors_all: ["select[name=division]", "select[name=district]", "select[name=upozila]",
+            "select[name=rmo]", "select[name=city]", "select[name=union]", "select[name=area]", "input[name=ward]",
+            "select[name=village]", "input[name=house]", "input[name=postOffice]", "input[name=postcode]"],
+        present_selector_min: ["input[name=house]", "input[name=postOffice]", "input[name=postcode]"],
+        permanent_selector_min: ["input[name=perHouse]", "input[name=perPostOffice]", "input[name=perPostcode]"],
+        marital_relate_field: ["select[name=maritalStatus]", "input[name=spouseName1", "input[name=spouseNid1", "input[name=spouseDeathDate1"],
+        input_has_other: ["area", "village", "disability", "religion"]
+    }
+
+    let changeInputState = function (inputs, mark) {
+        inputs.each((_, el) => {
+            $(el).attr("disabled", mark);
+            handleOtherFields(el, mark);
+        });
+    }
+
+    let disableInputs = function (inputs) {
+        inputs.each((_, field) => {
+            let oldValue = portalUtils.htmlDecode(oldValues["" + $(field).attr("name") + ""]);
+            $(field).val(oldValue);
+            $(field).parent().removeClass("updated").removeClass("error");
+            $(field).attr('disabled', true);
+            handleOtherFields(field, true);
+        });
+    }
+
+    let changeAddressState = function(x, mark) {
+        x.forEach(el => changeInputState($(el), mark));
+    }
+
+    let resetState = function(x, y, mark) {
+        x.forEach(el => el());
+        changeAddressState(y, mark);
+    }
+
+    function handleBirthPlaceFields() {
+        const filteredBirthPlace = birthPlaces.filter(bp => bp.id === oldValues["birthPlace"]);
+        if (filteredBirthPlace !== null && filteredBirthPlace.length > 0) {
+            const birthPlace = filteredBirthPlace[0];
+            if (birthPlace.countryCode === "88") {
+                $('select[name=birthPlace]').parent()
+                    .find($('input[name=birth-place-checkbox]'))
+                    .prop('checked', false)
+                    .trigger('change');
+            } else {
+                $('select[name=birthPlace]').parent()
+                    .find($('input[name=birth-place-checkbox]'))
+                    .prop('checked', true)
+                    .trigger('change');
+            }
+        }
+    }
+
+    container.on("change", ".select-field", function () {
+        let $checkBox = $(this);
+        let $inputs = $checkBox.parent().parent().find("select, input:not(:checkbox):not(:hidden)");
+
+        if ($checkBox.is(':checked')) {
+            if ($checkBox.hasClass("address-select-field")) {
+                if ($checkBox.hasClass("present-address")) {
+                    oldValues["voterAt"] === 'present'
+                        ? changeAddressState(helperMap.present_selector_min, false)
+                        : changeAddressState(helperMap.present_selectors_all, false);
+                } else {
+                    changeAddressState(helperMap.permanent_selector_min, false);
+                }
+            } else if ($checkBox.hasClass("marital-select-field")) {
+                helperMap.marital_relate_field.forEach(item => {
+                    changeInputState($(item), false);
+                    $(item).parent().find("input[type=checkbox]").prop("checked", true);
+                });
+            } else {
+                changeInputState($inputs, false);
+            }
+        } else if (!$checkBox.is(':checked')) {
+            $checkBox.parents("div.address-fields-container")
+                .find("div.column.field")
+                .removeClass("updated")
+                .removeClass("error");
+
+            if ($checkBox.hasClass("address-select-field")) {
+                if ($checkBox.hasClass("present-address")) {
+                    oldValues["voterAt"] === 'present'
+                        ? resetState(helperMap.present_lookup_min, helperMap.present_selector_min, true)
+                        : resetState(helperMap.present_lookup_all, helperMap.present_selectors_all, true);
+                } else {
+                    resetState(helperMap.permanent_lookup_min, helperMap.permanent_selector_min, true);
+                }
+            } else if ($checkBox.hasClass("marital-select-field")) {
+                helperMap.marital_relate_field.forEach((item) => {
+                    disableInputs($(item));
+                    $(item).parent().find("input[type=checkbox]").prop("checked", false);
+                });
+            } else if ($checkBox.hasClass("birthplace-select-field")) {
+                disableInputs($inputs);
+                handleBirthPlaceFields();
+            } else {
+                disableInputs($inputs);
+            }
+            container.trigger(info_modified_event);
+        }
+    });
+
+    var handleValueChange = function(element, group) {
+        var $input = $(element);
+        var oldValue = oldValues["" + $input.attr("name") +""];
+        var currentValue = $input.val().trim();
+        if(oldValue !== currentValue) {
+            $input.parent().addClass("updated");
+            if(group) {
+                $input.parents("div.address-fields-container").find("h4 > i").show();
+            } else {
+                $input.siblings("label").find("i.undo.icon").show();
+            }
+        } else {
+            $input.parent().removeClass("updated");
+            if(group) {
+                var updatedFiledCount =
+                    $input.parents("div.address-fields-container").find("div.column.field.updated").length;
+                if(updatedFiledCount === 0) {
+                    $input.parents("div.address-fields-container").find("h4 > i").hide();
+                }
+            } else {
+                $input.siblings("label").find("i.undo.icon").hide();
+            }
+        }
+        container.trigger(info_modified_event);
+    };
+
+    container.on("input", "div.column.grid:not(div.voter-area-change-detail) input[type=text]", function() {
+        var group = true;
+        if($(this).parents("div[data-tab=third]").length === 0) {
+            group = false;
+        }
+        handleValueChange(this, group);
+    });
+
+    container.on("change", "div.column.grid:not(div.voter-area-change-detail) select", function() {
+        var group = true;
+        if($(this).parents("div[data-tab=third]").length === 0) {
+            group = false;
+        }
+        handleValueChange(this, group);
+    });
+
+    container.on(info_modified_event, function() {
+        var firstCount = $("div[data-tab=first] div.column.field.updated").length +
+                         $("div[data-tab=first] div.ui.card.updated").length;
+        var secondCount = $("div[data-tab=second] div.column.field.updated").length;
+        var thirdCount = $("div[data-tab=third] div.column.field.updated").length;
+        var imgCount = $("img.updated").length;
+        var count = firstCount + secondCount + thirdCount + imgCount;
+        if(count <= 0) {
+            pageReloadHandler.destroy();
+        } else {
+            pageReloadHandler.destroy();
+            pageReloadHandler.init();
+        }
+        if(firstCount <= 0) {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=first] > i").hide();
+        } else {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=first] > i").show();
+        }
+        if(secondCount <= 0) {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=second] > i").hide();
+        } else {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=second] > i").show();
+        }
+        if(thirdCount <= 0) {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=third] > i").hide();
+        } else {
+            $("div.ui.top.attached.tabular.menu > a[data-tab=third] > i").show();
+        }
+    });
+
+    container.on("change", "select[class=data-tab-mobile]", function () {
+        let selectedTab = $(this).val();
+        let allTabItems = $(".ui.tabular.menu > a");
+        allTabItems.each( function (index, obj) {
+            let currentTab = $(obj).attr('data-tab');
+            $(obj).removeClass('active');
+        })
+
+        $(".ui.tabular.menu > a.item[data-tab=" + selectedTab + "]").trigger("click");
+    });
+
+    var resetOtherRelatedData = function() {
+        var $areaOther = $("input[name=areaOther]");
+        var $villageOther =  $("input[name=villageOther]");
+        $areaOther.hide().val("");
+        $villageOther.hide().val("");
+    };
+
+    var resetPermanentOtherRelatedData = function() {
+        var $areaOther = $("input[name=perAreaOther]");
+        var $villageOther =  $("input[name=perVillageOther]");
+        $areaOther.hide().val("");
+        $villageOther.hide().val("");
+    };
+
+    container.on("change", "select[name=gender]", function() {
+        helperMap.marital_relate_field.forEach(item => {
+            changeInputState($(item), false);
+            $(item).parent().find("input[type=checkbox]").prop("checked", true);
+        });
+    });
+
+    container.on("change", "select[name=division]", function() {
+        lookupLoader.load({
+            resource: "district",
+            filter: {divisionId: $(this).val()},
+            target: "select[name=district]",
+            reset:  "select[name=rmo], input[name=postOffice], input[name=postcode]",
+            remove: "select[name=upozila], select[name=city], select[name=union], select[name=area], select[name=village], input[name=postOffice], select[name=voterArea]",
+            done: resetOtherRelatedData
+        });
+    });
+
+    container.on("change", "select[name=perDivision]", function() {
+        lookupLoader.load({
+            resource: "district",
+            filter: {divisionId: $(this).val()},
+            target: "select[name=perDistrict]",
+            reset:  "select[name=perRmo], input[name=perPostOffice], input[name=perPostcode]",
+            remove: "select[name=perUpozila], select[name=perCity], select[name=perUnion], select[name=perArea], select[name=perVillage], input[name=perPostOffice], select[name=perVoterArea]",
+            done: resetPermanentOtherRelatedData
+        });
+    });
+
+    container.on("change", "select[name=district]", function () {
+        lookupLoader.load({
+            resource: "upozila",
+            filter: {districtId: $(this).val()},
+            target: "select[name=upozila]",
+            reset: "select[name=rmo]",
+            remove: "select[name=city], select[name=union], select[name=area], select[name=village], select[name=voterArea]",
+            done: resetOtherRelatedData
+        });
+        searchBoxLookupLoader.load({
+            resource: "postOffice",
+            filter: {districtId: $(this).val()},
+            target: "input[name=postOffice]",
+            reset: "input[name=postOffice], input[name=postcode]",
+            remove: "select[name=voterArea]",
+            elementToUpdate: "input[name=postcode]",
+            done: resetOtherRelatedData
+        });
+    });
+
+    container.on("change", "select[name=perDistrict]", function () {
+        lookupLoader.load({
+            resource: "upozila",
+            filter: {districtId: $(this).val()},
+            target: "select[name=perUpozila]",
+            reset: "select[name=perRmo]",
+            remove: "select[name=perCity], select[name=perUnion], select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+            done: resetPermanentOtherRelatedData
+        });
+        searchBoxLookupLoader.load({
+            resource: "postOffice",
+            filter: {districtId: $(this).val()},
+            target: "input[name=perPostOffice]",
+            reset: "input[name=perPostOffice], input[name=perPostcode]",
+            remove: "select[name=perVoterArea]",
+            elementToUpdate: "input[name=perPostcode]",
+            done: resetPermanentOtherRelatedData
+        });
+    });
+
+    container.on("change", "select[name=upozila]", function() {
+        var rmoId = $("select[name=rmo]").val();
+        if(rmoId) {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: $(this).val(), rmoId: rmoId},
+                target: "select[name=city]",
+                remove: "select[name=union], select[name=area], select[name=village], select[name=voterArea]",
+                done: resetOtherRelatedData
+            });
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: $(this).val(), cityId: "", rmoId: rmoId},
+                target: "select[name=union]",
+                remove: "select[name=area], select[name=village], select[name=voterArea]",
+                done: resetOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=perUpozila]", function() {
+        var rmoId = $("select[name=perRmo]").val();
+        if(rmoId) {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: $(this).val(), rmoId: rmoId},
+                target: "select[name=perCity]",
+                remove: "select[name=perUnion], select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+                done: resetPermanentOtherRelatedData
+            });
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: $(this).val(), cityId: "", rmoId: rmoId},
+                target: "select[name=perUnion]",
+                remove: "select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+                done: resetPermanentOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=rmo]", function() {
+        var upozilaId = $("select[name=upozila]").val();
+        if(upozilaId) {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: upozilaId, rmoId: $(this).val()},
+                target: "select[name=city]",
+                remove: "select[name=union], select[name=area], select[name=village], select[name=voterArea]",
+                done: resetOtherRelatedData
+            });
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: upozilaId, cityId: "", rmoId: $(this).val()},
+                target: "select[name=union]",
+                remove: "select[name=area], select[name=village], select[name=voterArea]",
+                done: resetOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=perRmo]", function() {
+        var upozilaId = $("select[name=perUpozila]").val();
+        if(upozilaId) {
+            lookupLoader.load({
+                resource: "city",
+                filter: {upozilaId: upozilaId, rmoId: $(this).val()},
+                target: "select[name=perCity]",
+                remove: "select[name=perUnion], select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+                done: resetPermanentOtherRelatedData
+            });
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: upozilaId, cityId: "", rmoId: $(this).val()},
+                target: "select[name=perUnion]",
+                remove: "select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+                done: resetPermanentOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=city]", function() {
+        let upozilaId = $("select[name=upozila]").val();
+        if(upozilaId) {
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: upozilaId, cityId: $(this).val(), rmoId: $("select[name=rmo]").val()},
+                target: "select[name=union]",
+                remove: "select[name=area], select[name=village], select[name=voterArea]",
+                done: resetOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=perCity]", function() {
+        var upozilaId = $("select[name=perUpozila]").val();
+        if(upozilaId) {
+            lookupLoader.load({
+                resource: "union",
+                filter: {upozilaId: upozilaId, cityId: $(this).val(), rmoId: $("select[name=perRmo]").val()},
+                target: "select[name=perUnion]",
+                remove: "select[name=perArea], select[name=perVillage], select[name=perVoterArea]",
+                done: resetPermanentOtherRelatedData
+            });
+        }
+    });
+
+    container.on("change", "select[name=union]", function() {
+        lookupLoader.load({
+            resource: "area",
+            filter: {unionId: $(this).val()},
+            target: "select[name=area]",
+            remove: "select[name=village]",
+            done: resetOtherRelatedData
+        });
+        lookupLoader.load({
+            resource: "voterArea",
+            filter: {unionId: $(this).val()},
+            target: "select[name=voterArea]",
+        });
+    });
+
+    container.on("change", "select[name=perUnion]", function() {
+        lookupLoader.load({
+            resource: "area",
+            filter: {unionId: $(this).val()},
+            target: "select[name=perArea]",
+            remove: "select[name=perVillage]",
+            done: resetPermanentOtherRelatedData
+        });
+        lookupLoader.load({
+            resource: "voterArea",
+            filter: {unionId: $(this).val()},
+            target: "select[name=perVoterArea]"
+        });
+    });
+
+    container.on("change", "select[name=area]", function() {
+        var val = $(this).val();
+        lookupLoader.load({
+            resource: "village",
+            filter: {areaId: val},
+            target: "select[name=village]",
+            done: function() {
+                if(val === 'undefined') {
+                    $("input[name=areaOther]").show().attr("disabled", false);
+                } else {
+                    $("input[name=areaOther]").hide().val("");
+                }
+                $("input[name=villageOther]").hide().val("");
+            }
+        });
+    });
+
+    container.on("change", "select[name=perArea]", function() {
+        var val = $(this).val();
+        lookupLoader.load({
+            resource: "village",
+            filter: {areaId: val},
+            target: "select[name=perVillage]",
+            done: function() {
+                if(val === 'undefined') {
+                    $("input[name=perAreaOther]").show();
+                } else {
+                    $("input[name=perAreaOther]").hide().val("");
+                }
+                $("input[name=perVillageOther]").hide().val("");
+            }
+        });
+    });
+
+    container.on("change", "select[name=village]", function() {
+        var val = $(this).val();
+        if(val === 'undefined') {
+            $("input[name=villageOther]").show().attr("disabled", false);
+            var modifiedFieldCount = $("div[data-tab=third] div.present-address div.column.field.updated").length;
+            if(modifiedFieldCount === 0) {
+                $("input[name=villageOther]").val(oldValues["villageOther"]);
+            }
+        } else {
+            $("input[name=villageOther]").hide().val("");
+        }
+    });
+
+    container.on("change", "select[name=perVillage]", function() {
+        var val = $(this).val();
+        if(val === 'undefined') {
+            $("input[name=perVillageOther]").show();
+            var modifiedFieldCount = $("div[data-tab=third] div.permanent-address div.column.field.updated").length;
+            if(modifiedFieldCount === 0) {
+                $("input[name=perVillageOther]").val(oldValues["perVillageOther"]);
+            }
+        } else {
+            $("input[name=perVillageOther]").hide().val("");
+        }
+    });
+
+    // container.on("change", "input[name=postOffice]", function () {
+    //     $("input[name=postcode]").val($(this).val());
+    // });
+
+    // container.on("change", "select[name=perPostOffice]", function () {
+    //     $("input[name=perPostcode]").val($(this).val());
+    // });
+
+    container.on("change", "div[data-tab=third] select", function() {
+        var $this = $(this);
+        var name = $this.attr("name") + "Name";
+        $("input[name="+ name +"]").val($this.find("option:selected").text());
+    });
+
+    container.on("click", "input[type=radio].voter-at", function() {
+        var $present = $("div.present-address div.voter-area-change-detail");
+        var $permanent = $("div.permanent-address div.voter-area-change-detail");
+        $present.hide().find("input").val("");
+        $permanent.hide().find("input").val("");
+        var currentValue = $(this).val();
+        if(currentValue === 'present' && currentValue !== oldValues['voterAt']) {
+            $present.show();
+        }
+        if(currentValue === 'permanent' && currentValue !== oldValues['voterAt']) {
+            $permanent.show();
+        }
+    });
+
+    container.on("change", "select[name=voterArea], select[name=perVoterArea]", function() {
+        var $present = $("div.present-address div.voter-area-change-detail");
+        var $permanent = $("div.permanent-address div.voter-area-change-detail");
+        $present.hide();
+        $permanent.hide();
+        var currentElementName = $(this).attr("name");
+        var currentValue = $(this).val();
+        if(currentElementName === 'voterArea' && currentValue !== oldValues['voterArea']) {
+            $present.show();
+        }
+        if(currentElementName === 'perVoterArea' && currentValue !== oldValues['perVoterArea']) {
+            $permanent.show();
+        }
+    });
+
+    container.on("click", "input[name=voterAt]", function() {
+        var $this = $(this);
+        if($this.is(":checked")) {
+            var $voterAreaEl = $("select[name=voterArea]");
+            var $parVoterAreaEl = $("select[name=perVoterArea]");
+            var $voterAreaContainer = $voterAreaEl.parent();
+            var $parVoterAreaContainer = $parVoterAreaEl.parent();
+            if($this.val() === 'present') {
+                if(oldValues['voterAt'] !== 'permanent') {
+                    $parVoterAreaEl.val("");
+                }
+                $parVoterAreaContainer.hide();
+                $voterAreaContainer.show();
+            }
+            if($this.val() === 'permanent') {
+                if(oldValues['voterAt'] !== 'present') {
+                    $voterAreaEl.val("");
+                }
+                $voterAreaContainer.hide();
+                $parVoterAreaContainer.show();
+            }
+        }
+    });
+
+    container.on("change", "select[name=religion]", function() {
+        let religionCurValue = $(this).val();
+        let religionOldValue = oldValues["religion"];
+        let $religionOther = $("input[name=religionOther]");
+        let religionOtherOldValue = oldValues["religionOther"];
+        if (religionOldValue !== "other" && religionCurValue === "other") {
+            $religionOther.show();
+            $religionOther.attr("disabled", false);
+            if (religionOtherOldValue !== '') $religionOther.val(religionOtherOldValue);
+        } else if (religionOldValue === "other" && religionCurValue !== "other") {
+            $religionOther.hide();
+            $religionOther.val("");
+        } else if (religionOldValue === "other" && religionCurValue === "other") {
+            $religionOther.show();
+            $religionOther.attr("disabled", false);
+            if (religionOtherOldValue !== '') $religionOther.val(religionOtherOldValue);
+        } else if (religionOldValue !== "other" && religionCurValue !== "other") {
+            $religionOther.hide();
+            $religionOther.val("");
+        }
+    });
+
+    container.on("change", "select[name=disability]", function() {
+        let disabilityCurValue = $(this).val();
+        let disabilityOldValue = oldValues["disability"];
+        let $disabilityOther = $("input[name=disabilityOther]");
+        let disabilityOtherOldValue = oldValues["disabilityOther"];
+        if (disabilityOldValue !== "other" && disabilityCurValue === "other") {
+            $disabilityOther.show();
+            $disabilityOther.attr("disabled", false);
+            if (disabilityOtherOldValue !== '') $disabilityOther.val(disabilityOtherOldValue);
+        } else if (disabilityOldValue === "other" && disabilityCurValue !== "other") {
+            $disabilityOther.hide();
+            $disabilityOther.val("");
+        } else if (disabilityOldValue === "other" && disabilityCurValue === "other") {
+            $disabilityOther.show();
+            $disabilityOther.attr("disabled", false);
+            if (disabilityOtherOldValue !== '') $disabilityOther.val(disabilityOtherOldValue);
+        } else if (disabilityOldValue !== "other" && disabilityCurValue !== "other") {
+            $disabilityOther.hide();
+            $disabilityOther.val("");
+        }
+    });
+
+});

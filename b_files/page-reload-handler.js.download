@@ -1,0 +1,16 @@
+(function($, global){
+
+    function pageReloadHandler() {
+        return global.pageReloadMessage;
+    }
+
+    global.pageReloadHandler = {
+        init: function() {
+            $(global).bind('beforeunload', pageReloadHandler);
+        },
+        destroy: function() {
+            $(global).unbind('beforeunload', pageReloadHandler);
+        }
+    };
+
+})(jQuery, window);

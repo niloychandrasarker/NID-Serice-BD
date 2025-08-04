@@ -1,0 +1,33 @@
+/* ---- Add new font face here to read fonts from resources ---- */
+
+/*@font-face {*/
+/*    font-family: 'noto-sans-bengali';*/
+/*    font-weight: 400;*/
+/*    font-display: swap;*/
+/*    src: url("../fonts/noto-sans/Noto_Sans_Bengali-Regular.ttf") format('truetype');*/
+/*    unicode-range: U+980-9FF;*/
+/*}*/
+
+/*@font-face {*/
+/*    font-family: 'noto-sans-bengali';*/
+/*    font-weight: 500;*/
+/*    font-display: swap;*/
+/*    src: url("../fonts/noto-sans/Noto_Sans_Bengali-Medium.ttf") format('truetype');*/
+/*    unicode-range: U+980-9FF;*/
+/*}*/
+
+/*@font-face {*/
+/*    font-family: 'noto-sans-bengali';*/
+/*    font-weight: 600;*/
+/*    font-display: swap;*/
+/*    src: url("../fonts/noto-sans/Noto_Sans_Bengali-Semi-Bold.ttf") format('truetype');*/
+/*    unicode-range: U+980-9FF;*/
+/*}*/
+
+/*@font-face {*/
+/*    font-family: 'noto-sans-bengali';*/
+/*    font-weight: 700;*/
+/*    font-display: swap;*/
+/*    src: url("../fonts/noto-sans/Noto_Sans_Bengali-Bold.ttf") format('truetype');*/
+/*    unicode-range: U+980-9FF;*/
+/*}*/

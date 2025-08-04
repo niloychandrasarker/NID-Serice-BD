@@ -1,0 +1,44 @@
+(function(global, $) {
+    global.portalUtils = {
+        htmlEncode: function(content) {
+            return $('<div/>').text(content).html();
+        },
+        htmlDecode: function(encoded) {
+            return $('<div/>').html(encoded).text();
+        },
+        getParameterByName: function(name) {
+            name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+            var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                results = regex.exec(location.search);
+            return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+        },
+        async: {
+            checksum: function(file) {
+                var deferred = $.Deferred();
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    var buffer = event.target.result;
+                    var bytes = new Uint8Array(buffer);
+                    var data = "";
+                    for(var i = 0, j = bytes.length; i < j; i++) {
+                        data += String.fromCharCode(bytes[i]);
+                    }
+                    var checksum = md5(data, true);
+                    deferred.resolve(checksum);
+                };
+                reader.readAsArrayBuffer(file);
+                return deferred.promise();
+            }
+        },
+        translateEnglishNumberToBangla: function (number) {
+            let bnDigits = [ "০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+            var banglaNumber = "";
+            while (number > 0) {
+                let bnDigit = bnDigits[number % 10];
+                banglaNumber = bnDigit + banglaNumber;
+                number = Math.floor(number / 10);
+            }
+            return banglaNumber;
+        }
+    }
+})(window, jQuery);

@@ -1,0 +1,229 @@
+(function (global, $) {
+    var form;
+    var errorBlock;
+    var defaultSettings = {};
+    var SpecialField = {
+        DATE: "date",
+        ALL: "all",
+        DAY: "day",
+        DOB_DAY: "dobDay",
+        GD_DAY: "gdDateDay",
+        MONTH: "month",
+        DOB_MONTH: "dobMonth",
+        GD_MONTH: "gdDateMonth",
+        YEAR: "year",
+        DOB_YEAR: "dobYear",
+        GD_YEAR: "gdDateYear"
+    };
+    var StatusCode = {
+        SUCCESS: "SUCCESS",
+        ERROR: "ERROR",
+        PENDING: "PENDING"};
+
+    var AjaxStatusHandlers = {
+        handleErrorStatus: function(jqXHR) {
+            form.find("input[name=captcha]").val("");
+            $("#captcha-image").attr("src", global.contextPath + "/captcha/");
+            errorHandler.showErrorStatus(jqXHR.error);
+        },
+        handlePendingStatus: function(jqXHR) {
+            var task = setInterval(function() {
+                $.get(global.contextPath + jqXHR.pending.url, function(response) {
+                    if(response.status === StatusCode.SUCCESS) {
+                        AjaxStatusHandlers.handleSuccessStatus(response);
+                        clearInterval(task);
+                    }
+                    if(response.status === StatusCode.ERROR) {
+                        AjaxStatusHandlers.handleErrorStatus(response);
+                        clearInterval(task);
+                    }
+                });
+            }, jqXHR.pending.interval);
+        },
+        handleSuccessStatus: function(jqXHR) {
+            if(jqXHR.success.redirect) {
+                global.location = global.contextPath + jqXHR.success.redirect;
+                return;
+            }
+            if(jqXHR.success.template) {
+                var templateParams = {};
+                templateParams.templateName = global.contextPath + jqXHR.success.template;
+                if(typeof defaultSettings.templateParams !== 'undefined') {
+                    if(typeof defaultSettings.templateParams.templateName !== 'undefined') {
+                        templateParams.templateName = defaultSettings.templateParams.templateName;
+                    }
+                    if(typeof defaultSettings.templateParams.partialViewContainer !== 'undefined') {
+                        templateParams.partialViewContainer = defaultSettings.templateParams.partialViewContainer;
+                    }
+                    if(typeof defaultSettings.templateParams.elementsToReplace !== 'undefined') {
+                        templateParams.elementsToReplace = defaultSettings.templateParams.elementsToReplace;
+                    }
+                    if(typeof defaultSettings.templateParams.after !== 'undefined') {
+                        templateParams.after = defaultSettings.templateParams.after;
+                    }
+                }
+                templateLoader.load(templateParams);
+                return;
+            }
+            console.log("stay !!");
+        }
+    };
+
+    var defaultDone = function(jqXHR) {
+        if(jqXHR.status === StatusCode.ERROR) {
+            AjaxStatusHandlers.handleErrorStatus(jqXHR);
+            return;
+        }
+        if(jqXHR.status === StatusCode.PENDING) {
+            AjaxStatusHandlers.handlePendingStatus(jqXHR);
+            return;
+        }
+        if(jqXHR.status === StatusCode.SUCCESS) {
+            AjaxStatusHandlers.handleSuccessStatus(jqXHR);
+        }
+    };
+    var defaultFail = function(jqXHR) {};
+
+    global.errorHandler = {
+        createErrorPresenter: function(error) {
+            return $(`
+                    <div class="error-presenter">
+                        <i class="caret up icon"></i>
+                        <div><label>${error.message}</label></div>
+                    </div>
+                    `);
+        },
+        showErrorStatus: function (error) {
+            if(error.dataTab) {
+                var $tab = $("a[data-tab=" + error.dataTab + "]");
+                if($tab.length > 0 && !$tab.hasClass("active")) {
+                    $(".data-tab-mobile option").each(function () {
+                        $(this).removeAttr("selected");
+                    })
+                    $(".data-tab-mobile option[value=" + error.dataTab + "]").prop("selected", true);
+                    $tab.trigger("click");
+                }
+            }
+            if(error.field) {
+                let error_div = errorHandler.createErrorPresenter(error);
+                if(this.checkFieldIsDate(error.field) === true) {
+                    if (error.field === SpecialField.DATE) {
+                        // Handle error for date field. example: invalid date, future_date, past_date etc
+                        let $errorField = $("div.three.fields.date");
+                        let errorFieldWidth = $errorField.outerWidth(true);
+                        $(error_div).width(errorFieldWidth)
+                            .insertAfter($errorField)
+                            .fadeIn(500)
+                            .css('display', 'flex');
+                        $errorField.addClass("error").parent().addClass("error");
+                        this.scrollAndFocusToElement($errorField);
+                    } else {
+                        // Handle error for specific date field (day, mont year)
+                        let $errorField = $("*[name=" + error.field + "]");
+                        let errorFieldPosBottom = $errorField.position().top + $errorField.outerHeight(true);
+                        let errorFieldPosLeft = $errorField.position().left;
+                        let errorFieldWidth = $("div.three.fields").outerWidth(true);
+                        $(error_div).insertAfter($errorField)
+                            .fadeIn(500)
+                            .css({
+                                display: "flex",
+                                width: errorFieldWidth,
+                                top: errorFieldPosBottom,
+                                left: errorFieldPosLeft
+                            });
+                        $errorField.parent().addClass("error");
+                        this.scrollAndFocusToElement($errorField);
+                    }
+                } else if (error.field === "voterAt") {
+                    // Handle error for voter at checkbox selection filed
+                    let $errorField = $("*[name=" + error.field + "]").closest(".voter-area-selection");
+                    let errorFieldWidth = $errorField.outerWidth(true);
+                    $(error_div).width(errorFieldWidth)
+                        .appendTo($errorField)
+                        .fadeIn(500)
+                        .css('display', 'flex');
+                    $errorField.addClass("error");
+                    this.scrollAndFocusToElement($errorField);
+                } else {
+                    // Handle error for input fields which is not special field
+                    let $errorField = $("*[name=" + error.field + "]");
+                    let errorFieldWidth = $errorField.outerWidth(true);
+                    $(error_div).width(errorFieldWidth)
+                        .insertAfter($errorField)
+                        .fadeIn(500)
+                        .css('display', 'flex');
+                    $errorField.parent().addClass("error");
+                    this.scrollAndFocusToElement($errorField);
+                }
+            }
+            else {
+                /* Handle error which is not field specific and can be related to more than one fields.
+                    example: wrong credential, account_lock etc.
+                */
+                $("#error-block").addClass("error").show().find("ul > li").text(error.message)
+                this.scrollAndFocusToElement($("#error-block"));
+            }
+        },
+        checkFieldIsDate: function (field) {
+            return Object.values(SpecialField).indexOf(field) >= 0;
+        },
+        scrollAndFocusToElement: function (element) {
+            $('html, body').animate({scrollTop: element.offset().top - 200}, 250, function() {
+                element.focus();
+            });
+        }
+    };
+
+    // public interface
+    global.asyncForm = {
+        handleWithCare: function(settings) {
+            form = $("#form");
+            if(typeof settings !== 'undefined') {
+                defaultSettings = settings;
+            } else {
+                defaultSettings = {};
+            }
+            if(typeof defaultSettings.formFragment !== 'undefined') {
+                var $formFragment = form.find("#form-fragment");
+                if($formFragment.length <= 0) {
+                    $formFragment = $("<input type='hidden' id='form-fragment' name='formFragment'>");
+                    form.append($formFragment);
+                }
+                $formFragment.val(defaultSettings.formFragment);
+            }
+
+            form.find("div, input").each(function(index, item) {
+                $(item).removeClass("error");
+            });
+            form.find(".error-presenter").each(function(index, item) {
+                $(item).remove();
+            });
+
+            errorBlock = $("#error-block");
+            errorBlock.hide();
+            var __data = typeof defaultSettings.data === 'undefined' ? form.serialize() : defaultSettings.data;
+            var __url = typeof defaultSettings.url === 'undefined' ? form.attr("action") : defaultSettings.url;
+            var __done = typeof defaultSettings.doneCallback === 'undefined' ? defaultDone : defaultSettings.doneCallback;
+            var __fail = typeof defaultSettings.failCallback === 'undefined' ? defaultFail : defaultSettings.failCallback;
+            var defer;
+            if(typeof defaultSettings.upload !== 'undefined') {
+                defer = $.ajax({
+                    type: 'POST',
+                    url: __url,
+                    data: __data,
+                    dataType: 'text',
+                    processData: false,
+                    contentType: false
+                });
+            } else {
+                defer = $.ajax({
+                    type: 'POST',
+                    url: __url,
+                    data: __data
+                });
+            }
+            defer.done(__done);
+            defer.fail(__fail);
+        }
+    };
+})(window, jQuery);

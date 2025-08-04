@@ -1,0 +1,46 @@
+$(window).load(function() {
+    $("#loading-resources").remove();
+    $("#container").show();
+    $("#submit-control").on("click", function() {
+        var form = $("#form");
+        form.find("input").each(function(index, item) {
+            $(item).parent().removeClass("error");
+        });
+        form.find(".error-presenter").each(function(index, item) {
+            $(item).remove();
+        });
+        var errorBlock = $("#error-block");
+        errorBlock.hide();
+        var deferred = $.ajax({
+            url: form.attr("action"),
+            type: 'POST',
+            data: form.serialize()
+        });
+        deferred.fail(function(jqXHR) {
+            if(jqXHR.status === 302) {
+                window.location = window.contextPath  + "/?session-expired=true";
+                return;
+            }
+            if(jqXHR.status === 401) {
+                var error = JSON.parse(jqXHR.responseText);
+                form.find("input[name=password]").val("");
+                form.find("input[name=captcha]").val("");
+                errorHandler.showErrorStatus(error);
+                // $("input[name=" + error.field + "]").parent().addClass("error");
+                // $("#error-block").show().find("ul > li").text(error.message);
+                $("#captcha-image").attr("src", window.contextPath + "/captcha/");
+                return;
+            }
+            var errorText = window.error[String(jqXHR.status)];
+            if(!errorText) {
+                errorText = window.error['unknown'];
+            }
+            errorBlock.show().find("ul > li").text(errorText);
+        });
+        deferred.done(function(data, textStatus, jqXHR) {
+            if(jqXHR.status === 200) {
+                window.location = window.contextPath + "/citizen-home/";
+            }
+        });
+    });
+});

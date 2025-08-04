@@ -1,0 +1,23 @@
+(function(globalScope, $) {
+    globalScope.tabularMenuSwitcher = {
+        activeTab: "",
+        init: function() {
+            tabularMenuSwitcher.activeTab = $(".ui.tabular.menu > a.item.active").attr("data-tab");
+        },
+        switchTo: function(tab) {
+            $(".data-tab-mobile option[value=" + tab + "]").prop("selected", true);
+            $(".ui.tabular.menu > a.item[data-tab=" + tab + "]").trigger("click");
+        },
+        switchToActiveTab: function() {
+            tabularMenuSwitcher.switchTo(tabularMenuSwitcher.activeTab);
+        }
+    }
+})(window, jQuery);
+
+$(document).ready(function() {
+    tabularMenuSwitcher.init();
+    $(document).on("click", ".ui.tabular.menu > a.item", function(event) {
+        var $target = $(event.target);
+        tabularMenuSwitcher.activeTab = $target.attr("data-tab");
+    });
+});

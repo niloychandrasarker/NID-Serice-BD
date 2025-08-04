@@ -1,0 +1,159 @@
+(function (globalScope, $) {
+
+    var path = globalScope.contextPath + "/citizen-home/lookup";
+
+    function populateElements(els, json) {
+        var html = '';
+        for (var key in json) {
+            if (json.hasOwnProperty(key)) {
+                html += '<option value="' + key + '">' + json[key] + '</option>'
+            }
+        }
+        $(els).append(html);
+    }
+
+    function removeElements(els) {
+        // Removing all option elements from select element
+        $(els).find("option:gt(0)").remove();
+
+        // Removing item list from input elements with autocomplete menus
+        $(els).each((index, element) => {
+            if ($(element).hasClass("ui-autocomplete-input")) {
+                $(element).autocomplete({
+                    source: []
+                });
+            }
+        });
+    }
+
+    function resetElements(els) {
+        $(els).val("");
+    }
+
+    function hideElements(els) {
+        $(els).hide();
+    }
+
+    //public interface
+    globalScope.lookupLoader = {
+        load: function (options) {
+            var data = new FormData();
+            for (var key in options.filter) {
+                if (options.filter.hasOwnProperty(key)) {
+                    data.append(key, options.filter[key]);
+                }
+            }
+            if (typeof options.path !== "undefined") {
+                path = options.path;
+            }
+            var defer = $.ajax({
+                type: 'POST',
+                url: path + "/" + options.resource,
+                data: data,
+                dataType: 'text',
+                processData: false,
+                contentType: false
+            });
+            defer.done(function (response) {
+                var errorMessageElement = $("#error-block");
+                var resp = JSON.parse(response);
+                resetElements(options.reset);
+                removeElements(options.target);
+                removeElements(options.remove);
+                hideElements(options.hide);
+                if (resp.status === "ERROR") {
+                    errorMessageElement.addClass("error").show()
+                        .find("ul > li").text(resp.error.message);
+                    return;
+                }
+                //expecting success here
+                errorMessageElement.hide().find("ul > li").text("");
+                populateElements(options.target, resp);
+                if(typeof options.done !== 'undefined') {
+                    options.done();
+                }
+            });
+        }
+    }
+
+    globalScope.searchBoxLookupLoader = {
+        load: function (options) {
+            var data = new FormData();
+            for (var key in options.filter) {
+                if (options.filter.hasOwnProperty(key)) {
+                    data.append(key, options.filter[key]);
+                }
+            }
+            if (typeof options.path !== "undefined") {
+                path = options.path;
+            }
+            var defer = $.ajax({
+                type: 'POST',
+                url: path + "/" + options.resource,
+                data: data,
+                dataType: 'text',
+                processData: false,
+                contentType: false
+            });
+            var elementList = [];
+            var elementMap = [];
+            defer.done(function (response) {
+                var errorMessageElement = $("#error-block");
+                var resp = JSON.parse(response);
+                resetElements(options.reset);
+                removeElements(options.target);
+                removeElements(options.remove);
+                hideElements(options.hide);
+                if (resp.status === "ERROR") {
+                    errorMessageElement.addClass("error").show()
+                        .find("ul > li").text(resp.error.message);
+                    return;
+                }
+                errorMessageElement.hide().find("ul > li").text("");
+                for (let key in resp) {
+                    if (resp.hasOwnProperty(key)) {
+                        elementList.push(resp[key]);
+                        elementMap[resp[key]] = key;
+                    }
+                }
+
+                $(options.target).autocomplete({
+                    source: elementList,
+                    minLength: 0,
+                    change: function (event, ui) {
+                        let val = $(this).val();
+                        let exists = $.inArray(val, elementList);
+                        if (exists < 0) {
+                            $(this).val("");
+                            $(options.elementToUpdate).val("");
+                            return false;
+                        }
+                        $(options.elementToUpdate).val(elementMap[val]);
+                    },
+                    select: function (event, ui) {
+                        let val = ui.item.label;
+                        $(this).val(val);
+                        $(options.elementToUpdate).val(elementMap[val]);
+                        return false;
+                    }
+                }).on('focus', function () {
+                    $(this).autocomplete("search", this.value);
+                }).on('keyup', function (event) {
+                    if (event.keyCode !== 13) { // not enter
+                        let val = $(this).val();
+                        let exists = $.inArray(val, elementList);
+                        if (exists < 0) {
+                            $(options.elementToUpdate).val("");
+                            return false;
+                        }
+                        $(options.elementToUpdate).val(elementMap[val]);
+                    }
+                });
+
+                if (typeof options.done !== 'undefined') {
+                    options.done();
+                }
+            });
+        }
+    }
+})(window, jQuery);

@@ -1,0 +1,30 @@
+$(document).ready(function () {
+    function stripTrailingSlash(str) {
+        if(str.substr(-1) == '/') {
+            return str.substr(0, str.length - 1);
+        }
+        return str;
+    }
+    $("#top-menu a").each(function() {
+        var $item = $(this);
+        var href = stripTrailingSlash($item.attr('href'));
+        var path = stripTrailingSlash(window.location.pathname);
+        if(href  ===  path) {
+            $item.attr("href", "javascript:void(0)");
+            $item.addClass('active');
+        } else {
+            $item.removeClass('active');
+        }
+    });
+
+    $(".ui.large.menu .link.item a, .ui.sidebar.menu .link.item a").each(function() {
+        var $item = $(this);
+        var href = stripTrailingSlash($item.attr('href'));
+        var path = stripTrailingSlash(window.location.pathname);
+        if(href  ===  path) {
+            $item.parent().addClass('active');
+        } else {
+            $item.parent().removeClass('active');
+        }
+    });
+});
